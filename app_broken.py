@@ -24,7 +24,10 @@ from src.utils import (
     create_trust_gauge,
     plot_confidence_calibration
 )
-from src.trust_methods import MahalanobisDetector, TemperatureScaling
+from src.trust_methods im                    # Detailed metrics
+                    st.subheader("📊 Trust Metrics")
+                    
+                    metric_cols = st.columns(3)t MahalanobisDetector, TemperatureScaling
 
 # Try to import GradCAM
 try:
@@ -421,8 +424,7 @@ def show_main_page(trust_model, data_loader, use_entropy, use_odin, use_mahalano
                             
                         except Exception as e:
                             st.error(f"Failed to load sample: {str(e)}")
-            
-            # Display selected sample
+              # Display selected sample
             if 'selected_sample' in st.session_state:
                 sample_id = st.session_state['selected_sample']
                 if f'sample_{sample_id}_tensor' in st.session_state:
@@ -430,9 +432,14 @@ def show_main_page(trust_model, data_loader, use_entropy, use_odin, use_mahalano
                     sample_label = st.session_state[f'sample_{sample_id}_label']
                     
                     original_image = tensor_to_image(sample_tensor)
-                    st.image(original_image, 
-                            caption=f"Sample {sample_id} (True: {data_loader.classes[sample_label]})", 
-                            use_container_width=True)
+                    
+                    # Create smaller columns for the image display
+                    img_col1, img_col2, img_col3 = st.columns([1, 2, 1])
+                    with img_col2:
+                        st.image(original_image, 
+                                caption=f"Sample {sample_id} (True: {data_loader.classes[sample_label]})", 
+                                width=200)  # Fixed width for smaller display
+                    
                     input_tensor = sample_tensor.unsqueeze(0)
                     current_method = "sample"
                     
@@ -446,13 +453,17 @@ def show_main_page(trust_model, data_loader, use_entropy, use_odin, use_mahalano
                 try:
                     data_loaders = data_loader.get_loaders()
                     test_dataset = data_loaders['datasets']['test_clean']
-                    
-                    # Get a truly random sample
+                      # Get a truly random sample
                     idx = np.random.randint(0, len(test_dataset))
                     sample_tensor, sample_label = test_dataset[idx]
                     
                     original_image = tensor_to_image(sample_tensor)
-                    st.image(original_image, caption=f"Random Sample (True: {data_loader.classes[sample_label]})", use_container_width=True)
+                    
+                    # Create smaller columns for the image display
+                    img_col1, img_col2, img_col3 = st.columns([1, 2, 1])
+                    with img_col2:
+                        st.image(original_image, caption=f"Random Sample (True: {data_loader.classes[sample_label]})", width=200)
+                    
                     input_tensor = sample_tensor.unsqueeze(0)
                     current_method = "random"
                     
@@ -473,13 +484,17 @@ def show_main_page(trust_model, data_loader, use_entropy, use_odin, use_mahalano
                 try:
                     data_loaders = data_loader.get_loaders()
                     test_key = 'test_clean' if test_type == "Clean" else 'test_shifted'
-                    test_dataset = data_loaders['datasets'][test_key]
-                    
+                    test_dataset = data_loaders['datasets'][test_key]                    
                     idx = np.random.randint(0, len(test_dataset))
                     sample_tensor, sample_label = test_dataset[idx]
                     
                     original_image = tensor_to_image(sample_tensor)
-                    st.image(original_image, caption=f"Test Image ({test_type}) - True: {data_loader.classes[sample_label]}", use_container_width=True)
+                    
+                    # Create smaller columns for the image display  
+                    img_col1, img_col2, img_col3 = st.columns([1, 2, 1])
+                    with img_col2:
+                        st.image(original_image, caption=f"Test Image ({test_type}) - True: {data_loader.classes[sample_label]}", width=200)
+                    
                     input_tensor = sample_tensor.unsqueeze(0)
                     current_method = "test"
                     
@@ -507,12 +522,9 @@ def show_main_page(trust_model, data_loader, use_entropy, use_odin, use_mahalano
                     # Move tensor to device
                     device = next(trust_model.model.parameters()).device
                     input_tensor = input_tensor.to(device)
-                      # Get predictions with trust analysis
-                    results = trust_model.predict_with_trust(
-                        input_tensor,
-                        use_odin=use_odin,
-                        use_mahalanobis=use_mahalanobis
-                    )
+                    
+                    # Get predictions with trust analysis
+                    results = trust_model.predict_with_trust(input_tensor)
                     
                     # Extract results
                     prediction = results['predictions'][0]
@@ -553,36 +565,25 @@ def show_main_page(trust_model, data_loader, use_entropy, use_odin, use_mahalano
                     st.markdown(f'<div class="metric-card {trust_color}"><h4>Trust Level: {trust_level}</h4><p>Score: {trust_score:.3f}</p></div>', unsafe_allow_html=True)
                     
                     # Detailed metrics
-                    st.subheader("📊 Trust Metrics")
+                    st.subheader("� Trust Metrics")
+                    metric_cols = st.columns(3)
                     
-                    # Dynamic column count based on enabled methods
-                    enabled_methods = 1  # Always show entropy
-                    if use_odin:
-                        enabled_methods += 1
-                    if use_mahalanobis:
-                        enabled_methods += 1
-                    
-                    metric_cols = st.columns(enabled_methods)
-                    
-                    col_idx = 0
-                    with metric_cols[col_idx]:
+                    with metric_cols[0]:
                         st.metric("Entropy", f"{entropy:.3f}", help="Lower = more confident")
-                    col_idx += 1
                     
-                    if use_odin:
-                        with metric_cols[col_idx]:
-                            if 'odin_entropy' in results and results['odin_entropy'][0] is not None:
-                                st.metric("ODIN Score", f"{results['odin_entropy'][0]:.3f}", help="OOD detection score")
-                            else:
-                                st.metric("ODIN Score", "Failed", help="ODIN computation failed")
-                        col_idx += 1
+                    with metric_cols[1]:
+                        if 'odin_entropy' in results and results['odin_entropy'][0] is not None:
+                            odin_val = results['odin_entropy'][0]
+                            st.metric("ODIN Score", f"{odin_val:.3f}", help="OOD detection score")
+                        else:
+                            st.metric("ODIN Score", "N/A", help="ODIN computation failed or disabled")
                     
-                    if use_mahalanobis:
-                        with metric_cols[col_idx]:
-                            if 'mahalanobis_distance' in results and results['mahalanobis_distance'][0] is not None:
-                                st.metric("Mahal. Dist.", f"{results['mahalanobis_distance'][0]:.3f}", help="Distance to training distribution")
-                            else:
-                                st.metric("Mahal. Dist.", "Computing...", help="Mahalanobis distance computation")
+                    with metric_cols[2]:
+                        if 'mahalanobis_distance' in results and results['mahalanobis_distance'][0] is not None:
+                            mahal_val = results['mahalanobis_distance'][0] 
+                            st.metric("Mahal. Dist.", f"{mahal_val:.3f}", help="Distance to training distribution")
+                        else:
+                            st.metric("Mahal. Dist.", "N/A", help="Mahalanobis detector not trained")
                     
                 except Exception as e:
                     st.error(f"Analysis failed: {str(e)}")
@@ -655,92 +656,81 @@ def show_main_page(trust_model, data_loader, use_entropy, use_odin, use_mahalano
                     value=f"{entropy_normalized:.3f}",
                     help="Higher values indicate more certain predictions. Based on entropy calculation."
                 )
-                  # ODIN metric - only show if enabled
-                if use_odin:
-                    if 'odin_entropy' in results and results['odin_entropy'][0] is not None:
-                        odin_score = max(0, 1 - (results['odin_entropy'][0] / np.log(10)))  # Normalize
-                        st.metric(
-                            label="🚨 OOD Detection Score", 
-                            value=f"{odin_score:.3f}",
-                            help="ODIN method score. Higher values suggest in-distribution samples."
-                        )
-                    else:
-                        st.metric(
-                            label="🚨 OOD Detection Score", 
-                            value="Failed",
-                            help="ODIN computation failed"
-                        )
                 
-                # Mahalanobis distance metric - only show if enabled
-                if use_mahalanobis:
-                    if 'mahalanobis_distance' in results and results['mahalanobis_distance'][0] is not None:
-                        mahal_dist = results['mahalanobis_distance'][0]
-                        # Normalize for display (lower distance is better)
-                        mahal_score = max(0, 1 - (mahal_dist / 100))  # Rough normalization
-                        st.metric(
-                            label="📏 Distribution Similarity", 
-                            value=f"{mahal_score:.3f}",
-                            help=f"Raw Mahalanobis distance: {mahal_dist:.2f}. Higher scores indicate closer match to training data."
-                        )
-                    else:
-                        st.metric(
-                            label="📏 Distribution Similarity", 
-                            value="Computing...",
-                            help="Mahalanobis distance measures similarity to training distribution"
-                        )
-              # Trust Metrics Comparison - Compact Layout
-            st.subheader("📊 Trust Metrics Comparison")
-            
-            # Create comparison in single row with chart and table side by side
-            comparison_cols = st.columns([2, 1])
-            
-            with comparison_cols[0]:
-                # Create a more informative bar chart
-                trust_metrics = []
-                metric_names = []
-                metric_descriptions = []
-                
-                # Add entropy
-                trust_metrics.append(max(0, 1 - (entropy / np.log(10))))
-                metric_names.append("Prediction Certainty")
-                metric_descriptions.append("Based on entropy")
-                
-                # Add ODIN if enabled and available
-                if use_odin and 'odin_entropy' in results and results['odin_entropy'][0] is not None:
-                    trust_metrics.append(max(0, 1 - (results['odin_entropy'][0] / np.log(10))))
-                    metric_names.append("ODIN Score")
-                    metric_descriptions.append("Out-of-distribution detection")
-                
-                # Add Mahalanobis if enabled and available
-                if use_mahalanobis and 'mahalanobis_distance' in results and results['mahalanobis_distance'][0] is not None:
-                    trust_metrics.append(max(0, 1 - (results['mahalanobis_distance'][0] / 100)))
-                    metric_names.append("Distribution Similarity")
-                    metric_descriptions.append("Mahalanobis distance")
-                
-                # Create DataFrame for better visualization
-                if trust_metrics:
-                    trust_df = pd.DataFrame({
-                        'Metric': metric_names,
-                        'Score': trust_metrics,
-                        'Description': metric_descriptions
-                    })
-                    
-                    # Create bar chart with better formatting
-                    st.bar_chart(trust_df.set_index('Metric')['Score'], height=300)
-                else:
-                    st.info("No trust metrics to display. Enable trust methods in the sidebar.")
-            
-            with comparison_cols[1]:
-                st.write("**Metric Details:**")
-                # Display table with details
-                if 'trust_df' in locals() and len(trust_df) > 0:
-                    st.dataframe(
-                        trust_df[['Metric', 'Score']],
-                        use_container_width=True,
-                        hide_index=True
+                # ODIN metric
+                if 'odin_entropy' in results and results['odin_entropy'][0] is not None:
+                    odin_score = max(0, 1 - (results['odin_entropy'][0] / np.log(10)))  # Normalize
+                    st.metric(
+                        label="🚨 OOD Detection Score", 
+                        value=f"{odin_score:.3f}",
+                        help="ODIN method score. Higher values suggest in-distribution samples."
                     )
                 else:
-                    st.write("Enable trust methods to see detailed metrics.")
+                    st.metric(
+                        label="🚨 OOD Detection Score", 
+                        value="Not Available",
+                        help="ODIN method requires gradient computation"
+                    )
+                
+                # Mahalanobis distance metric  
+                if 'mahalanobis_distance' in results and results['mahalanobis_distance'][0] is not None:
+                    mahal_dist = results['mahalanobis_distance'][0]
+                    # Normalize for display (lower distance is better)
+                    mahal_score = max(0, 1 - (mahal_dist / 100))  # Rough normalization
+                    st.metric(
+                        label="📏 Distribution Similarity", 
+                        value=f"{mahal_score:.3f}",
+                        help=f"Raw Mahalanobis distance: {mahal_dist:.2f}. Higher scores indicate closer match to training data."
+                    )
+                else:
+                    st.metric(
+                        label="📏 Distribution Similarity", 
+                        value="Computing...",
+                        help="Mahalanobis distance measures similarity to training distribution"
+                    )
+            
+            # Additional trust information
+            st.subheader("📊 Trust Metrics Comparison")
+            
+            # Create a more informative bar chart
+            trust_metrics = []
+            metric_names = []
+            metric_descriptions = []
+            
+            # Add entropy
+            trust_metrics.append(max(0, 1 - (entropy / np.log(10))))
+            metric_names.append("Prediction Certainty")
+            metric_descriptions.append("Based on entropy")
+            
+            # Add ODIN if available
+            if 'odin_entropy' in results and results['odin_entropy'][0] is not None:
+                trust_metrics.append(max(0, 1 - (results['odin_entropy'][0] / np.log(10))))
+                metric_names.append("ODIN Score")
+                metric_descriptions.append("Out-of-distribution detection")
+            
+            # Add Mahalanobis if available
+            if 'mahalanobis_distance' in results and results['mahalanobis_distance'][0] is not None:
+                trust_metrics.append(max(0, 1 - (results['mahalanobis_distance'][0] / 100)))
+                metric_names.append("Distribution Similarity")
+                metric_descriptions.append("Mahalanobis distance")
+            
+            # Create DataFrame for better visualization
+            if trust_metrics:
+                trust_df = pd.DataFrame({
+                    'Metric': metric_names,
+                    'Score': trust_metrics,
+                    'Description': metric_descriptions
+                })
+                
+                # Use Streamlit's built-in bar chart with better formatting
+                st.bar_chart(trust_df.set_index('Metric')['Score'])
+                
+                # Display table with details
+                st.dataframe(
+                    trust_df,
+                    use_container_width=True,
+                    hide_index=True
+                )
     
     # Show instructions only when no image is loaded
     else:

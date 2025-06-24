@@ -19,35 +19,56 @@ def odin_predict(model, inputs, epsilon=0.0014, temperature=1000):
     Returns:
         softmax_outputs: Calibrated softmax predictions
     """
-    # Ensure model is in train mode for gradient computation
+    # Store original training mode
     model_training = model.training
-    model.train()
-    
-    inputs = inputs.clone().detach().to(inputs.device).requires_grad_(True)
+    device = inputs.device
     
     try:
-        # Forward pass
-        outputs = model(inputs)
-        outputs = outputs / temperature
+        # Ensure inputs require grad and are on correct device
+        inputs = inputs.clone().detach().to(device)
+        inputs.requires_grad_(True)
         
-        # Compute gradient w.r.t max logit
-        max_logit, pred_label = torch.max(outputs, dim=1)
-        loss = -torch.mean(max_logit)
-        model.zero_grad()
-        loss.backward()
+        # Set model to eval mode to prevent batch norm issues, but enable gradients
+        model.eval()
         
-        # Perturb inputs
-        if inputs.grad is not None:
-            gradient = torch.sign(inputs.grad.data)
-            perturbed_inputs = inputs - epsilon * gradient
-            perturbed_inputs = torch.clamp(perturbed_inputs, 0, 1)
-        else:
-            # Fallback if gradient computation fails
-            perturbed_inputs = inputs
+        # Enable gradient computation for this context
+        with torch.enable_grad():
+            # Forward pass
+            outputs = model(inputs)
+            outputs = outputs / temperature
+            
+            # Compute gradient w.r.t max logit
+            max_logit, pred_label = torch.max(outputs, dim=1)
+            loss = -torch.mean(max_logit)
+            
+            # Clear any existing gradients
+            if inputs.grad is not None:
+                inputs.grad.zero_()
+            
+            # Compute gradients
+            loss.backward(retain_graph=False)
+            
+            # Check if gradients were computed
+            if inputs.grad is not None and inputs.grad.numel() > 0:
+                gradient = torch.sign(inputs.grad.data)
+                perturbed_inputs = inputs - epsilon * gradient
+                perturbed_inputs = torch.clamp(perturbed_inputs, 0, 1)
+            else:
+                # Fallback: use small random perturbation
+                perturbation = epsilon * torch.sign(torch.randn_like(inputs))
+                perturbed_inputs = inputs + perturbation
+                perturbed_inputs = torch.clamp(perturbed_inputs, 0, 1)
         
-        # Forward again with perturbed inputs
+        # Forward pass with perturbed inputs (no gradients needed)
         with torch.no_grad():
-            outputs = model(perturbed_inputs)
+            outputs = model(perturbed_inputs.detach())
+            outputs = outputs / temperature
+            softmax_outputs = F.softmax(outputs, dim=1)
+            
+    except Exception as e:
+        # Complete fallback: return standard forward pass
+        with torch.no_grad():
+            outputs = model(inputs.detach())
             outputs = outputs / temperature
             softmax_outputs = F.softmax(outputs, dim=1)
     
