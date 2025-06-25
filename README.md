@@ -26,7 +26,7 @@ TrustLens is an explainable and trust-aware AI prototype that classifies images 
 ### Setup
 1. Clone the repository:
 ```bash
-git clone <repository-url>
+git clone https://github.com/Leptons1618/TrustNet.git
 cd TrustNet
 ```
 
